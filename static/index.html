@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SocioMol Arm Builder</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/ngl@latest/dist/ngl.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-main">
+          <div>
+            <p class="eyebrow">Local STA Preparation Tool</p>
+            <h1>SocioMol Arm Builder</h1>
+            <p class="subtitle">
+              Pick and record two reference points per arm on a reference STA map,
+              inspect an optional fitted model, and export centered Angstrom coordinates.
+            </p>
+          </div>
+          <div class="topbar-note">
+            <span>No fitting inside the app</span>
+            <span>Internal origin: map box center</span>
+            <span>Units: Angstrom</span>
+          </div>
+        </div>
+        <section class="setup-bar panel">
+          <div class="field-group">
+            <label for="map-file">Reference STA map (.mrc)</label>
+            <input id="map-file" type="file" accept=".mrc,.map" />
+          </div>
+          <div class="field-group">
+            <label for="voxel-size">Voxel size (Angstrom)</label>
+            <input id="voxel-size" type="number" min="0" step="0.001" placeholder="Use header if available" />
+          </div>
+          <div class="field-group">
+            <label for="model-file">Optional fitted model (.pdb / .cif)</label>
+            <input id="model-file" type="file" accept=".pdb,.cif,.mmcif" />
+          </div>
+          <div class="field-group">
+            <label for="model-representation">Model representation</label>
+            <select id="model-representation">
+              <option value="cartoon-sidechains">Cartoon + sidechains</option>
+              <option value="cartoon">Cartoon</option>
+            </select>
+          </div>
+          <div class="map-meta compact" id="map-meta">
+            <p class="meta-title">Map metadata</p>
+            <p>No map loaded yet.</p>
+          </div>
+        </section>
+      </header>
+
+      <main class="workspace">
+        <section class="viewport-panel">
+          <div class="panel-header">
+            <div>
+              <h2>3D Viewport</h2>
+              <p>
+                Click the map or fitted model while capture mode is active to place
+                the Anchor (Exit Point) and Guide Point.
+              </p>
+            </div>
+            <div class="viewer-status" id="viewer-status">
+              Load a map to begin.
+            </div>
+          </div>
+          <div class="viewer-toolbar">
+            <div class="toggle-grid toggle-grid-compact">
+              <label class="toggle">
+                <input id="toggle-map" type="checkbox" checked />
+                <span>Show map</span>
+              </label>
+              <label class="toggle">
+                <input id="toggle-model" type="checkbox" checked />
+                <span>Show fitted model</span>
+              </label>
+              <label class="toggle">
+                <input id="toggle-anchors" type="checkbox" checked />
+                <span>Show anchor points</span>
+              </label>
+            </div>
+          </div>
+          <div class="viewport-frame">
+            <div id="viewport"></div>
+          </div>
+          <div class="capture-readout">
+            <div>
+              <span class="label">Draft Anchor</span>
+              <span id="draft-point1-text">Not set</span>
+            </div>
+            <div>
+              <span class="label">Draft Guide Point</span>
+              <span id="draft-point2-text">Not set</span>
+            </div>
+            <div>
+              <span class="label">Last picked point</span>
+              <span id="last-picked-text">None</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="sidebar">
+          <section class="panel">
+            <h2>Arm Editor</h2>
+            <div class="field-group">
+              <label for="arm-name">Arm name</label>
+              <input id="arm-name" type="text" placeholder="Arm 1" />
+            </div>
+            <div class="coordinate-grid">
+              <div class="coord-block">
+                <h3>Anchor (Exit Point) — centered Å</h3>
+                <div class="xyz-grid">
+                  <input id="point1-x" type="number" step="0.001" placeholder="X" />
+                  <input id="point1-y" type="number" step="0.001" placeholder="Y" />
+                  <input id="point1-z" type="number" step="0.001" placeholder="Z" />
+                </div>
+              </div>
+              <div class="coord-block">
+                <h3>Guide Point — centered Å</h3>
+                <div class="xyz-grid">
+                  <input id="point2-x" type="number" step="0.001" placeholder="X" />
+                  <input id="point2-y" type="number" step="0.001" placeholder="Y" />
+                  <input id="point2-z" type="number" step="0.001" placeholder="Z" />
+                </div>
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="tangent-direction">Tangent direction</label>
+              <select id="tangent-direction">
+                <option value="direction_point_to_anchor">Guide Point → Anchor (Picked Inwards)</option>
+                <option value="anchor_to_direction_point">Anchor → Guide Point (Picked Outwards)</option>
+              </select>
+            </div>
+            <div class="refine-box">
+              <div class="field-group">
+                <label for="nudge-step">Nudge step (Angstrom)</label>
+                <input id="nudge-step" type="number" min="0" step="0.001" value="1" />
+              </div>
+              <div class="nudge-grid" aria-label="Nudge Anchor">
+                <span>Anchor</span>
+                <button class="ghost" data-nudge-point="point1" data-axis="0" data-sign="-1">X-</button>
+                <button class="ghost" data-nudge-point="point1" data-axis="0" data-sign="1">X+</button>
+                <button class="ghost" data-nudge-point="point1" data-axis="1" data-sign="-1">Y-</button>
+                <button class="ghost" data-nudge-point="point1" data-axis="1" data-sign="1">Y+</button>
+                <button class="ghost" data-nudge-point="point1" data-axis="2" data-sign="-1">Z-</button>
+                <button class="ghost" data-nudge-point="point1" data-axis="2" data-sign="1">Z+</button>
+              </div>
+              <div class="nudge-grid" aria-label="Nudge Guide Point">
+                <span>Guide Pt</span>
+                <button class="ghost" data-nudge-point="point2" data-axis="0" data-sign="-1">X-</button>
+                <button class="ghost" data-nudge-point="point2" data-axis="0" data-sign="1">X+</button>
+                <button class="ghost" data-nudge-point="point2" data-axis="1" data-sign="-1">Y-</button>
+                <button class="ghost" data-nudge-point="point2" data-axis="1" data-sign="1">Y+</button>
+                <button class="ghost" data-nudge-point="point2" data-axis="2" data-sign="-1">Z-</button>
+                <button class="ghost" data-nudge-point="point2" data-axis="2" data-sign="1">Z+</button>
+              </div>
+              <div class="button-row">
+                <button id="duplicate-arm" class="ghost" hidden>Duplicate current arm</button>
+                <button id="reset-to-picked" class="ghost" hidden>Reset to picked values</button>
+              </div>
+            </div>
+            <div class="button-row">
+              <button id="capture-points" class="primary">Capture Anchor + Guide Point in viewport</button>
+              <button id="clear-draft" class="ghost">Clear editor</button>
+            </div>
+            <div class="button-row">
+              <button id="save-arm" class="primary">Save arm</button>
+              <button id="cancel-edit" class="ghost" hidden>Cancel edit</button>
+            </div>
+            <div class="draft-summary" id="draft-summary">
+              Draft arm is incomplete.
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-header">
+              <h2>Defined Arms</h2>
+              <span class="count-badge" id="arm-count">0</span>
+            </div>
+            <div class="arm-list" id="arm-list">
+              <div class="empty-state">
+                No arms defined yet. Load a map, capture two points, then save.
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>Export</h2>
+            <div class="button-row">
+              <button id="export-json" class="primary">Export arm_geometry.json</button>
+              <button id="export-markers" class="ghost" hidden>Export preview markers</button>
+            </div>
+            <p class="footnote">
+              JSON export includes arm coordinates relative to the map box center in Angstrom.
+              The exported file is directly compatible with <code>sociomol preprocess --model-json</code>.
+            </p>
+          </section>
+        </aside>
+      </main>
+
+      <section class="legacy-ui" hidden>
+        <div class="field-group">
+          <label for="preset-select">Preset hook</label>
+          <select id="preset-select"></select>
+        </div>
+        <label class="toggle">
+          <input id="toggle-landmarks" type="checkbox" checked />
+          <span>Show biological landmarks</span>
+        </label>
+        <div class="hint-box" id="preset-hint">
+          Preset hooks are placeholders in the MVP. Landmark data can be added later
+          without changing the core arm workflow.
+        </div>
+        <div class="field-group">
+          <label for="validation-example">Expected reference</label>
+          <select id="validation-example">
+            <option value="custom">Custom expected coordinates</option>
+            <option value="arm1">Known-good Arm1</option>
+            <option value="arm2">Known-good Arm2</option>
+          </select>
+        </div>
+        <div class="coordinate-grid">
+          <div class="coord-block">
+            <h3>Expected point 1</h3>
+            <div class="xyz-grid">
+              <input id="expected-point1-x" type="number" step="0.001" placeholder="X" />
+              <input id="expected-point1-y" type="number" step="0.001" placeholder="Y" />
+              <input id="expected-point1-z" type="number" step="0.001" placeholder="Z" />
+            </div>
+          </div>
+          <div class="coord-block">
+            <h3>Expected point 2</h3>
+            <div class="xyz-grid">
+              <input id="expected-point2-x" type="number" step="0.001" placeholder="X" />
+              <input id="expected-point2-y" type="number" step="0.001" placeholder="Y" />
+              <input id="expected-point2-z" type="number" step="0.001" placeholder="Z" />
+            </div>
+          </div>
+        </div>
+        <div class="validation-result" id="validation-result">
+          Enter or load expected coordinates to compare against the current draft arm.
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
